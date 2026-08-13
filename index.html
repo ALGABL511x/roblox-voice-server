@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceBlox</title>
+    <style>
+        body {
+            background-color: #f3f4f6;
+            font-family: Tahoma, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: #ffffff;
+            width: 340px;
+            padding: 25px;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .status {
+            background: #e5e7eb;
+            color: #4b5563;
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+        .logo {
+            font-weight: bold;
+            font-size: 18px;
+            color: #111;
+        }
+        .mic-container {
+            position: relative;
+            margin: 30px auto;
+            width: 140px;
+            height: 140px;
+            border: 2px dashed #93c5fd;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .mic-btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+        .mic-btn.active {
+            background: #dc2626;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .ctrl-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            background: #fff;
+            color: #374151;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .ctrl-btn.muted {
+            background: #fef2f2;
+            color: #dc2626;
+            border-color: #fecaca;
+        }
+        .nearby-section {
+            text-align: right;
+            border-top: 1px solid #f3f4f6;
+            padding-top: 15px;
+        }
+        .nearby-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+        .nearby-box {
+            background: #f9fafb;
+            border-radius: 16px;
+            padding: 15px;
+            color: #6b7280;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .counter {
+            background: #eff6ff;
+            color: #2563eb;
+            padding: 4px 10px;
+            border-radius: 50%;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="header">
+            <span id="statusBadge" class="status">غير متصل</span>
+            <span class="logo">VoiceBlox 🔊</span>
+        </div>
+
+        <div class="mic-container">
+            <button id="mainBtn" class="mic-btn" onclick="toggleMic()">
+                <span style="font-size: 24px;">🎙️</span>
+                <span style="margin-top: 5px; font-size: 14px;">تفعيل</span>
+            </button>
+        </div>
+
+        <div class="controls">
+            <button id="speakerBtn" class="ctrl-btn" onclick="toggleSpeaker()">🔊 سبيكر</button>
+            <button id="muteBtn" class="ctrl-btn muted" onclick="toggleMute()">🎤 المايك مقفل</button>
+        </div>
+
+        <div class="nearby-section">
+            <div class="nearby-title">القريبين منك</div>
+            <div class="nearby-box">
+                <div class="counter">0</div>
+                <div>ما في أحد قريب. تحرّك باللعبة وبيطلعون هنا.</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('userId');
+
+        let localStream = null;
+        let isMuted = false;
+
+        if (userId) {
+            socket.emit('join-room', userId);
+            document.getElementById('statusBadgeinnerText = "متصل";
+            document.getElementById('statusBadge').style.background = "#dcfce7";
+            document.getElementById('statusBadge').style.color = "#166534";
+        }
+
+        async function toggleMic() {
+            const btn = document.getElementById('mainBtn');
+            const muteBtn = document.getElementById('muteBtn');
+            
+            if (!localStream) {
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    btn.classList.add('active');
+                    btn.innerHTML = '<span style="font-size: 24px;">🔴</span><span style="margin-top: 5px; font-size: 14px;">إيقاف</span>';
+                    muteBtn.classList.remove('muted');
+                    muteBtn.innerText = "🎤 المايك شغال";
+                } catch (err) {
+                    alert("الرجاء السماح بالوصول للمايك من المتصفح");
+                }
+            } else {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+                btn.classList.remove('active');
+                btn.innerHTML = '<span style="font-size: 24px;">🎙️</span><span style="margin-top: 5px; font-size: 14px;">تفعيل</span>';
+                muteBtn.classList.add('muted');
+                muteBtn.innerText = "🎤 المايك مقفل";
+            }
+        }
+
+        function toggleMute() {
+            if (!localStream) return;
+            isMuted = !isMuted;
+            localStream.getAudioTracks()[0].enabled = !isMuted;
+            const muteBtn = document.getElementById('muteBtn');
+            if (isMuted) {
+                muteBtn.classList.add('muted');
+                muteBtn.innerText = "🎤 المايك مقفل";
+            } else {
+                muteBtn.classList.remove('muted');
+                muteBtn.innerText = "🎤 المايك شغال";
+            }
+        }
+
+        function toggleSpeaker() {
+            alert("تم ضبط السبيكر تلقائياً");
+        }
+    </script>
+</body>
+</html>
