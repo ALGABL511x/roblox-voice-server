@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Voice</title></head>
+<body>
+    <h2 id="status">المايك مغلق</h2>
+    <button id="micBtn" onclick="toggle()">🎙️</button>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        function toggle() { alert("تم الاتصال!"); }
+    </script>
+</body>
+</html>
