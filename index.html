@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceBlox</title>
+    <style>
+        body { background: #f3f4f6; font-family: Tahoma, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: #fff; width: 340px; padding: 25px; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); text-align: center; }
+        .mic-btn { background: #2563eb; color: white; border: none; width: 110px; height: 110px; border-radius: 50%; cursor: pointer; font-size: 16px; margin: 20px auto; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .mic-btn.active { background: #dc2626; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>VoiceBlox 🔊</h2>
+        <p id="status">جاري الاتصال...</p>
+        <button id="micBtn" class="mic-btn" onclick="toggleMic()">🎙️ تفعيل</button>
+    </div>
+    <audio id="remoteAudio" autoplay></audio>
+
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('userId');
+        let localStream = null;
+        let peerConnection = null;
+        const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+        if (userId) {
+            socket.emit('join-room', userId);
+            document.getElementById('status').innerText = "متصل، اضغط تفعيل المايك";
+        }
+
+        async function toggleMic() {
+            const btn = document.getElementById('micBtn');
+            if (!localStream) {
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    btn.classList.add('active');
+                    btn.innerText = "🔴 إيقاف";
+                    document.getElementById('status').innerText = "المايك شغال الآن";
+                } catch (err) {
+                    alert("يجب السماح بالمايك من المتصفح!");
+                }
+            } else {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+                btn.classList.remove('active');
+                btn.innerText = "🎙️ تفعيل";
+                document.getElementById('status').innerText = "تم الإيقاف";
+            }
+        }
+
+        socket.on('user-connected', async (id) => {
+            if (!localStream) return;
+            peerConnection = new RTCPeerConnection(servers);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.ontrack = (event) => {
+                document.getElementById('remoteAudio').srcObject = event.streams[0];
+            };
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('signal', { target: id, data: { candidate: event.candidate } });
+                }
+            };
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('signal', { target: id, data: { offer: offer } });
+        });
+
+        socket.on('signal', async (data) => {
+            if (!localStream) return;
+            if (!peerConnection) {
+                peerConnection = new RTCPeerConnection(servers);
+                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+                peerConnection.ontrack = (event) => {
+                    document.getElementById('remoteAudio').srcObject = event.streams[0];
+                };
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        socket.emit('signal', { target: data.sender, data: { candidate: event.candidate } });
+                    }
+                };
+            }
+
+            if (data.data.offer) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.data.offer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                socket.emit('signal', { target: data.sender, data: { answer: answer } });
+            } else if (data.data.answer) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.data.answer));
+            } else if (data.data.candidate) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.data.candidate));
+            }
+        });
+    </script>
+</body>
+</html>
